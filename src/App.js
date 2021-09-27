@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
 import './App.css';
-import axios from 'axios';
 import Kitten from './pages/kitten';
 
 function App() {
+  const [ allKittensData, setAllKittensData ] = useState([]);
   const [ kittensData, setKittensData ] = useState([]);
+  const [ sort, setSort ] = useState();
+  const [ hideGlasses, setHideGlasses ] = useState(false);
 
-  const collectionId = '0xfd211f3b016a75bc8d73550ac5adc2f1cae780c0';
-  const paintSwapParams = '?allowNSFW=true&numToFetch=20&numToSkip=0'
+  useEffect(()=>{
+    getData();
+  },[])
 
   const getData=()=>{
     fetch('./data/kittens.json'
@@ -22,20 +25,44 @@ function App() {
         return response.json();
       })
       .then(function(myJson) {
-        setKittensData(myJson);
         countRarity(myJson);
       });
   }
 
-  useEffect(()=>{
-    getData();
-  },[])
+  function handleSortChange(value){
+    
+    let kittens = kittensData;
 
+    console.log(value);
+
+    switch (value) {
+      case 'rarity':
+        kittens = kittens.sort(function(a, b){
+          const averageA = ((parseFloat(a.rarity.glass) + parseFloat(a.rarity.mouth) + parseFloat(a.rarity.eye) + parseFloat(a.rarity.ear))/4).toFixed(2);
+          const averageB = ((parseFloat(b.rarity.glass) + parseFloat(b.rarity.mouth) + parseFloat(b.rarity.eye) + parseFloat(b.rarity.ear))/4).toFixed(2);
+
+          return averageA-averageB
+        });
+        break;
+    
+      case 'number':
+        kittens = kittens.sort(function(a, b){return a.id-b.id});
+        break;
+      default:
+        break;
+    }
+    console.log(kittens);
+
+    setKittensData([...kittens]);
+    setSort(value);
+
+
+  }
 
   function countRarity(data){
     //ear frame
     let earFrameGroup = {}
-    const total = 419; 
+    const total = 420; 
 
     data.forEach(kitten => {
       if(earFrameGroup[kitten.attributes[0].value] === undefined){
@@ -90,8 +117,19 @@ function App() {
 
     console.log(glassFrameGroup);
 
+  
 
-    data.forEach(kitten => {
+    let kittens = data.map(kitten => {
+
+      let rarity = [];
+
+      rarity['ear'] = ((earFrameGroup[kitten.attributes[0].value] * 100 )/total ).toFixed(2);
+      rarity['eye'] = ((eyeFrameGroup[kitten.attributes[1].value] * 100 )/total ).toFixed(2);
+      rarity['mouth'] = ((mounthFrameGroup[kitten.attributes[2].value] * 100 )/total ).toFixed(2);
+      rarity['glass'] = kitten.attributes[3].value == 'none' ? 82.38 : ((glassFrameGroup[kitten.attributes[3].value] * 100 )/total ).toFixed(2)
+
+      kitten['rarity'] = rarity;
+
       console.log(kitten.name);
       console.log('Ear ' + kitten.attributes[0].value + ' appears in ' + earFrameGroup[kitten.attributes[0].value] + ' kittens - '  + ((earFrameGroup[kitten.attributes[0].value] * 100 )/total ).toFixed(2) + '%');
       console.log('Eye ' + kitten.attributes[1].value + ' appears in ' + eyeFrameGroup[kitten.attributes[1].value] + ' kittens - '  + ((eyeFrameGroup[kitten.attributes[1].value] * 100 )/total ).toFixed(2) + '%');
@@ -103,66 +141,36 @@ function App() {
       }
       else{
         console.log('Glass ' + kitten.attributes[3].value + ' appears in ' + glassFrameGroup[kitten.attributes[3].value] + ' kittens - '  + ((glassFrameGroup[kitten.attributes[3].value] * 100 )/total ).toFixed(2) + '%');
-
       }
 
 
       console.log('#############################################################################################')
       console.log('#############################################################################################')
 
-
+      return kitten;
     });
 
 
-  }
-
-  function allKittenDataToJson(){
-    let allKittens = [];
-
-    for (let i = 0; i <= 419; i++) {
-      axios.get('https://kittens.fakeworms.studio/api/kitten/' + i).then(kitten => {
-          allKittens.push(kitten.data);
-
-        }).catch(err => {
-          console.log('error');
-        })      
-    }
-
-    setTimeout(() => {
-      const sorted = allKittens.sort(function(a, b){return a.id-b.id});
-      console.log('all kittens data', sorted);
-      setKittensData(sorted);
-    }, 5000);
-  }
-
-  async function fetchKittens(){
-    let kittens = [];
-    
-    await axios.get('https://api.paintswap.finance/nfts/' + collectionId + paintSwapParams).then(data => {
-      console.log('data', data.data);
-
-      data.data.nfts.forEach(nft => {
-        axios.get('https://kittens.fakeworms.studio/api/kitten/' + nft.tokenId).then(kitten => {
-          kittens.push(kitten.data);
-          setKittensData([...kittens]);
-        }).catch(err => {
-
-        })
-      });
-    })
-
-    console.log('kittens data', kittens)
+    console.log(kittens);
     setKittensData(kittens);
+    setAllKittensData(kittens);
+
   }
 
   return (
     <div className="App">
       
-      Fantom Kittens
+      <div className='header'>
+      Kittens Rarity Ranking
+
+      </div>
 
       <div>
-        List of all Kittens
-
+        Sort By 
+        <select value={sort} onChange={(e) => handleSortChange(e.target.value)}>
+          <option value='number'>Number</option>
+          <option value='rarity'>Rarity</option>
+        </select>
         <div className='list-container'>
         {kittensData && kittensData.map(kitten => {
           return (
